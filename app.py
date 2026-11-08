@@ -4,7 +4,7 @@ from __future__ import annotations
 import streamlit as st
 
 from imagelab.io.loader import ImageLoadError
-from imagelab.ui import tab_color, tab_overview
+from imagelab.ui import tab_color, tab_face, tab_filter, tab_overview
 from imagelab.ui.sidebar import render_sidebar
 from imagelab.ui.state import cached_load
 
@@ -29,6 +29,6 @@ with tab1:
 with tab2:
     tab_color.render(rgb)
 with tab3:
-    st.info("開發中：自訂卷積核、濾波前後比較與 PSNR。")
+    tab_filter.render(rgb)
 with tab4:
-    st.info("開發中：人臉偵測。")
+    tab_face.render(rgb)
