@@ -12,7 +12,7 @@
 | [03_filtering_psnr.md](03_filtering_psnr.md) | 卷積濾波、輸入防呆、PSNR | P6–P8 |
 | [04_face_detection.md](04_face_detection.md) | Haar-Cascade 人臉偵測與信心度 | P8 |
 | [05_git_deployment.md](05_git_deployment.md) | README、GitHub 推送、Streamlit Cloud 部署 | P9–P14 |
-| [06_report_and_colab.md](06_report_and_colab.md) | 技術報告 PDF（進行中；Colab 已取消） | P15–P17 |
+| [06_report_and_colab.md](06_report_and_colab.md) | 技術報告 PDF（進行中；Colab 已取消） | P15–P22 |
 | [raw_exports/](raw_exports/) | 完整對話原文匯出（不可竄改的底稿） | 全部 |
 
 ## 每個階段的格式
@@ -42,6 +42,9 @@
 | P15 | 2026-11-09 17:19 | 補入截圖與結果，要求檢查缺漏並開始報告 |
 | P16 | 2026-11-09 20:47 | 補入作者與 pytest 結果、取消 Colab、詢問防呆畫面做法 |
 | P17 | 2026-11-09 21:59 | 完成防呆截圖、要求整理其他截圖檔名 |
+| P18 | 2026-11-09 22:13 | 回答補件問題（濾波設定、無其他 AI 工具、人臉偵測截圖） |
+| P19 | 2026-11-09 22:31 | 完成邊界處理對照與人臉偵測截圖 |
+| P20–P22 | 2026-11-09 22:41–22:53 | 確認信心度與預設邊界處理、重拍 minNeighbors 低／高的截圖 |
 
 ## AI 失誤與修正總表
 
