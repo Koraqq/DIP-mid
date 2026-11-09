@@ -6,9 +6,9 @@
 
 | 項目 | 連結 |
 |---|---|
-| 線上展示（Streamlit Cloud） | `<STREAMLIT_APP_URL>` |
+| 線上展示（Streamlit Cloud） | https://dip-mid-tb8vrujcpzjqkwkc5onscz.streamlit.app/ |
 | Colab 展示 | `<COLAB_URL>` |
-| 原始碼（GitHub） | `<GITHUB_REPO_URL>` |
+| 原始碼（GitHub） | https://github.com/koraqq/DIP-mid |
 
 ## 功能
 
@@ -26,7 +26,7 @@
 ### 方法 A：uv（建議）
 
 ```bash
-git clone <GITHUB_REPO_URL>
+git clone https://github.com/koraqq/DIP-mid
 cd DIP-mid
 uv sync
 uv run streamlit run app.py
