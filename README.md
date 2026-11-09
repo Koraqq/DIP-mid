@@ -8,7 +8,7 @@
 |---|---|
 | 線上展示（Streamlit Cloud） | https://dip-mid-tb8vrujcpzjqkwkc5onscz.streamlit.app/ |
 | 原始碼（GitHub） | https://github.com/koraqq/DIP-mid |
-| 技術報告（PDF，31 頁） | [下載 report.pdf](https://github.com/koraqq/DIP-mid/raw/main/docs/report/report.pdf) |
+| 技術報告（PDF，32 頁） | [下載 report.pdf](https://github.com/koraqq/DIP-mid/raw/main/docs/report/report.pdf) |
 
 ## 功能
 
