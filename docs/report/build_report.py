@@ -16,7 +16,7 @@ import sys
 import tempfile
 
 from docx import Document
-from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_TAB_ALIGNMENT, WD_TAB_LEADER
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Cm, Pt, RGBColor
@@ -207,9 +207,11 @@ def fit_tables(doc):
                 t_el.set("{http://www.w3.org/XML/1998/namespace}space", "preserve")
 
 
-def postprocess(src: pathlib.Path, dst: pathlib.Path) -> int:
+def postprocess(src: pathlib.Path, dst: pathlib.Path, headings=None, pages=None) -> int:
     doc = Document(src)
     fit_tables(doc)
+    if headings:
+        insert_toc(doc, headings, pages)
     for tbl in doc.tables:
         add_borders(tbl)
         for ri, row in enumerate(tbl.rows):
@@ -238,6 +240,81 @@ def postprocess(src: pathlib.Path, dst: pathlib.Path) -> int:
     doc.save(dst)
     return placeholders
 
+# ---------------------------------------------------------------- 目錄（含頁碼）
+def parse_headings(md_text: str):
+    """取出 report.md 的 H1、H2 標題（略過 YAML 前言、程式碼區塊與「目錄」本身）。"""
+    body = md_text.split("\n---\n", 1)[1] if md_text.startswith("---") else md_text
+    heads, in_code = [], False
+    for line in body.splitlines():
+        if line.strip().startswith("```"):
+            in_code = not in_code
+            continue
+        if in_code:
+            continue
+        m = re.match(r"(#{1,2}) (.+?)\s*$", line)
+        if m:
+            text = m.group(2).replace("{-}", "").strip()
+            if re.sub(r"[\s　]+", "", text) == "目錄":
+                continue
+            heads.append((len(m.group(1)), text))
+    return heads
+
+
+def _squash(s: str) -> str:
+    return re.sub(r"[\s　​]+", "", s)
+
+
+def find_pages(pdf: pathlib.Path, headings, start_page: int = 3):
+    """在 PDF 中依序找出每個標題所在頁（目錄頁之後；頁碼從 1 起算，與頁尾頁碼一致）。"""
+    out = subprocess.run(["pdftotext", str(pdf), "-"], capture_output=True, text=True, check=True).stdout
+    texts = [_squash(t) for t in out.split("\f")]
+    pages, cur = [], start_page
+    for _level, text in headings:
+        key_full = _squash(text)
+        key_title = _squash(re.sub(r"^[\d.]+", "", text))   # 不含編號（標題旁若緊接清單，編號與標題可能被拆開）
+        found = None
+        for key in (key_full, key_title):
+            for i in range(cur, len(texts) + 1):
+                if key and key in texts[i - 1]:
+                    found = i
+                    break
+            if found:
+                break
+        if found:
+            cur = found
+        pages.append(found)
+    return pages
+
+
+def insert_toc(doc, headings, pages):
+    marker = next((p for p in doc.paragraphs if p.text.strip() == "{{TOC}}"), None)
+    if marker is None:
+        return
+    for (level, text), pg in zip(headings, pages):
+        para = marker.insert_paragraph_before()
+        pf = para.paragraph_format
+        pf.tab_stops.add_tab_stop(Cm(16.6), WD_TAB_ALIGNMENT.RIGHT, WD_TAB_LEADER.DOTS)
+        pf.left_indent = Cm(0 if level == 1 else 0.9)
+        pf.space_before = Pt(8 if level == 1 else 1)
+        pf.space_after = Pt(1)
+        run_ = para.add_run(f"{text}\t{pg if pg else ''}")
+        run_.bold = level == 1
+        run_.font.size = Pt(11.5 if level == 1 else 10)
+    marker._element.getparent().remove(marker._element)
+
+
+def convert_to_pdf(docx_path: pathlib.Path) -> pathlib.Path:
+    """LibreOffice 的設定檔與輸出放在系統暫存目錄（寫入專案資料夾可能失敗）。"""
+    tmp = pathlib.Path(tempfile.mkdtemp(prefix="report_pdf_"))
+    shutil.copy(docx_path, tmp / "report.docx")
+    env = dict(os.environ, HOME=str(tmp))
+    run(["soffice", f"-env:UserInstallation=file://{tmp}/lo_profile", "--headless",
+         "--convert-to", "pdf", "--outdir", str(tmp), str(tmp / "report.docx")], env=env)
+    out = BUILD / "report.pdf"
+    shutil.copy(tmp / "report.pdf", out)
+    shutil.rmtree(tmp, ignore_errors=True)
+    return out
+
 
 def main():
     BUILD.mkdir(exist_ok=True)
@@ -247,17 +324,25 @@ def main():
     raw = BUILD / "report_raw.docx"
     run(["pandoc", str(HERE / "report.md"), "-f", "markdown", "-o", str(raw),
          "--reference-doc", str(ref), "--resource-path", str(HERE)])
+    headings = parse_headings((HERE / "report.md").read_text(encoding="utf-8"))
+    pages = [None] * len(headings)          # 第一輪先留空，取得實際頁碼後再填入
     final = BUILD / "report.docx"
-    n = postprocess(raw, final)
-    # LibreOffice 的設定檔與輸出放在系統暫存目錄（寫入專案資料夾可能失敗）
-    tmp = pathlib.Path(tempfile.mkdtemp(prefix="report_pdf_"))
-    shutil.copy(final, tmp / "report.docx")
-    env = dict(os.environ, HOME=str(tmp))
-    run(["soffice", f"-env:UserInstallation=file://{tmp}/lo_profile", "--headless",
-         "--convert-to", "pdf", "--outdir", str(tmp), str(tmp / "report.docx")], env=env)
-    shutil.copy(tmp / "report.pdf", HERE / "report.pdf")
-    shutil.rmtree(tmp, ignore_errors=True)
-    print(f"完成：{HERE / 'report.pdf'}（待補標記 {n} 處）")
+    pdf = None
+    for attempt in range(1, 5):
+        n = postprocess(raw, final, headings, pages)
+        pdf = convert_to_pdf(final)
+        found = find_pages(pdf, headings)
+        print(f"第 {attempt} 輪：目錄頁碼{'已穩定' if found == pages else '更新'} {found}")
+        if found == pages:
+            break
+        pages = found
+    else:
+        raise SystemExit("目錄頁碼未收斂，請檢查版面。")
+    missing = [h for h, pg in zip(headings, pages) if pg is None]
+    if missing:
+        raise SystemExit(f"找不到這些標題所在頁：{missing}")
+    shutil.copy(pdf, HERE / "report.pdf")
+    print(f"完成：{HERE / 'report.pdf'}（待補標記 {n} 處，目錄 {len(headings)} 條）")
 
 
 if __name__ == "__main__":
