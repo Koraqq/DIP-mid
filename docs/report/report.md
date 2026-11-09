@@ -1,7 +1,7 @@
 ---
 title: "Image Lab：互動式影像處理與人臉分析工具"
 subtitle: "數位影像處理（DIP）期中作業　技術報告"
-author: "【待補：姓名／學號】"
+author: "林奕丞　C113151143"
 date: "2026-11-09"
 ---
 
@@ -65,11 +65,12 @@ DIP-mid/
 
 # 2　可執行連結
 
+本專案以 Streamlit Community Cloud 作為線上即時展示，不另提供 Colab。
+
 | 項目 | 連結 |
 |:------------|:------------------------------------------------|
 | 線上展示（Streamlit Cloud，Public） | https://dip-mid-tb8vrujcpzjqkwkc5onscz.streamlit.app/ |
 | 原始碼（GitHub，Public） | https://github.com/koraqq/DIP-mid |
-| Colab 展示 | 【待補：Colab 連結】 |
 
 # 3　系統架構與資料流
 
@@ -98,7 +99,7 @@ DIP-mid/
 
 # 4　功能說明與測試案例分析
 
-測試影像為一張 800×533 的 JPEG 照片（含一張清晰人臉與兩張失焦人臉）。【待補：測試影像來源與授權】
+測試影像為一張 800×533 的 JPEG 照片（含一張清晰人臉與兩張失焦人臉）。本影像僅供本課程作業之非營利教學與展示用途，不作任何商業使用；作業繳交後儲存庫將改為私人。
 
 ## 4.1　功能 1：影像載入與基礎解析
 
@@ -207,22 +208,33 @@ $$\mathrm{out}[i,j]=\sum_{u}\sum_{v}K'[u,v]\;P[i+u,\;j+v],\qquad K'[u,v]=K[k-1-u
 
 | 測試案例 | 預期行為 | 驗證方式 |
 |:--------------------|:--------------------------|:------------------------|
-| 非方陣（如 3×4） | 顯示「必須是方陣」，不執行運算 | `test_non_square_rejected` |
-| 偶數尺寸（如 2×2、4×4） | 顯示「必須是奇數」（偶數沒有中心點） | `test_even_size_rejected` |
+| 非方陣（如 3×4） | 顯示「必須是方陣」，不執行運算 | `test_non_square_rejected`、圖 15 |
+| 偶數尺寸（如 2×2、4×4） | 顯示「必須是奇數」（偶數沒有中心點） | `test_even_size_rejected`、圖 16 |
 | 各列數字個數不同 | 指出第 1 列與出錯列的個數 | `test_ragged_rows_rejected` |
-| 含非數字（如 `abc`） | 指出第幾列第幾格 | `test_bad_token_reports_position` |
+| 含非數字（如 `abc`） | 指出第幾列第幾格 | `test_bad_token_reports_position`、圖 17 |
 | NaN、inf、1e999 | 拒絕：不是有限數值 | `test_nan_and_inf_rejected` |
 | 空白輸入 | 提示請輸入核矩陣 | `test_empty_input` |
 | 超過 15×15 的核 | 拒絕：核過大 | `test_too_large_rejected` |
 | 核比影像還大 | 拒絕並說明 | `test_kernel_larger_than_image_rejected` |
 | 全零核 | 警告：結果會是全黑 | `test_warnings` |
-| 總和為 0 且勾選正規化 | 略過正規化並提示（不除以零） | `test_normalize_skips_zero_sum_kernel` |
+| 總和為 0 且勾選正規化 | 略過正規化並提示（不除以零） | `test_normalize_skips_zero_sum_kernel`、圖 18 |
+| 原圖與濾波後完全相同（Identity） | MSE = 0，PSNR 顯示 ∞ | `test_identical_images_give_infinite_psnr`、圖 19 |
 | 全形逗號、Unicode 負號、`;` 分列 | 正常解析 | `test_parse_fullwidth_characters` 等 |
 | 與教科書定義逐元素對照 | 三種邊界、3×3 與 5×5 非對稱核皆一致 | `test_matches_naive_definition_with_asymmetric_kernels` |
 | 與 OpenCV `filter2D` 對照 | 翻轉核後三種邊界皆一致（誤差 < 1e-9） | `test_matches_opencv_filter2d` |
 | 輸出截斷與偏移 | 超過 255 截為 255、負值截為 0；偏移 128 正確 | `test_clipping_and_offset` |
 
-【待補：防呆介面截圖——非方陣、偶數尺寸、含非數字、Sobel 勾選正規化的「已略過」提示、Identity 的 PSNR 顯示 ∞（各一張）】
+**防呆介面實測**：以下 5 張為實際輸入錯誤或特殊核時的畫面。輸入有誤時，左側顯示明確的錯誤或警告訊息，右側提示先修正，程式不會當機。
+
+![圖 15　防呆 1：輸入 2×3 的非方陣，顯示「卷積核必須是方陣，目前是 2×3」](figures/guard_1_nonsquare.png){width=13cm}
+
+![圖 16　防呆 2：輸入 2×2 的偶數尺寸核，顯示「尺寸必須是奇數」](figures/guard_2_even.png){width=13cm}
+
+![圖 17　防呆 3：第 2 列第 3 格輸入 abc，指出是哪一列哪一格不是有效數字](figures/guard_3_badtoken.png){width=13cm}
+
+![圖 18　防呆 4：Sobel X 勾選正規化，核總和為 0，自動略過並提示（避免除以零）](figures/guard_4_sobel_normalize.png){width=13cm}
+
+![圖 19　防呆 5：Identity 範本，濾波前後完全相同（MSE = 0），PSNR 顯示 ∞](figures/guard_5_identity_inf.png){width=13cm}
 
 ## 4.4　功能 4：人臉偵測
 
@@ -240,9 +252,9 @@ $$\mathrm{confidence}=1-e^{-w/2}$$
 
 ### 4.4.2　實測畫面
 
-![圖 15　功能 4：人臉偵測（綠框為偵測結果，標籤為 #編號 與信心度）](figures/ui_face_default.png){width=13cm}
+![圖 20　功能 4：人臉偵測（綠框為偵測結果，標籤為 #編號 與信心度）](figures/ui_face_default.png){width=13cm}
 
-【待補：偵測到的人臉數、各框信心度（請依圖 15 填寫）；以及 minNeighbors 調低／調高、最小人臉尺寸調大、無人臉影像、多人臉影像各一張截圖與觀察】
+【待補：偵測到的人臉數、各框信心度（請依圖 20 填寫）；以及 minNeighbors 調低／調高、最小人臉尺寸調大、無人臉影像、多人臉影像各一張截圖與觀察】
 
 ### 4.4.3　邊界條件
 
@@ -256,11 +268,11 @@ $$\mathrm{confidence}=1-e^{-w/2}$$
 | 畫框 | 不修改輸入影像；框貼近邊緣時標籤不超出影像 | `test_draw_*` |
 | 超大影像（> 1280 像素） | 先縮小再偵測，框換算回原圖座標 | 實作於 `haar_detector.py` |
 | 多人同時連線 | 對分類器加鎖，避免非執行緒安全造成當機 | 實作於 `haar_detector.py` |
-| 多人臉、失焦、側臉 | Haar 以正臉為主，失焦或側臉可能漏偵測 | 【待補：以圖 15 與調參截圖說明】 |
+| 多人臉、失焦、側臉 | Haar 以正臉為主，失焦或側臉可能漏偵測 | 【待補：以圖 20 與調參截圖說明】 |
 
 ### 4.4.4　單元測試
 
-所有模組皆以 pytest 測試（`tests/`）：【待補：貼上 `uv run pytest -q` 的結果摘要行】
+所有模組皆以 pytest 測試（`tests/`）：在開發機（Windows、Python 3.12）上的結果為 **71 個通過、1 個略過**（0 失敗）。略過的是選用的真實影像測試：`assets/samples/` 內沒有 `face*.jpg` 範例圖時會自動略過；其餘包含需要 Haar 模型的偵測測試皆通過。
 
 # 5　PSNR 公式與濾波效果評估
 

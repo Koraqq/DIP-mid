@@ -7,7 +7,6 @@
 | 項目 | 連結 |
 |---|---|
 | 線上展示（Streamlit Cloud） | https://dip-mid-tb8vrujcpzjqkwkc5onscz.streamlit.app/ |
-| Colab 展示 | `<COLAB_URL>` |
 | 原始碼（GitHub） | https://github.com/koraqq/DIP-mid |
 
 ## 功能

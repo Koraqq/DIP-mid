@@ -12,7 +12,7 @@
 | [03_filtering_psnr.md](03_filtering_psnr.md) | 卷積濾波、輸入防呆、PSNR | P6–P8 |
 | [04_face_detection.md](04_face_detection.md) | Haar-Cascade 人臉偵測與信心度 | P8 |
 | [05_git_deployment.md](05_git_deployment.md) | README、GitHub 推送、Streamlit Cloud 部署 | P9–P14 |
-| [06_report_and_colab.md](06_report_and_colab.md) | 技術報告 PDF 與 Colab 展示（進行中） | P15 起 |
+| [06_report_and_colab.md](06_report_and_colab.md) | 技術報告 PDF（進行中；Colab 已取消） | P15–P17 |
 | [raw_exports/](raw_exports/) | 完整對話原文匯出（不可竄改的底稿） | 全部 |
 
 ## 每個階段的格式
@@ -40,6 +40,8 @@
 | P13 | 2026-11-09 15:58 | 提供 Streamlit Cloud 部署網址 |
 | P14 | 2026-11-09 16:00 | 附部署畫面截圖，要求開始整理 Prompt Log |
 | P15 | 2026-11-09 17:19 | 補入截圖與結果，要求檢查缺漏並開始報告 |
+| P16 | 2026-11-09 20:47 | 補入作者與 pytest 結果、取消 Colab、詢問防呆畫面做法 |
+| P17 | 2026-11-09 21:59 | 完成防呆截圖、要求整理其他截圖檔名 |
 
 ## AI 失誤與修正總表
 
