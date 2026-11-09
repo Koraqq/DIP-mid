@@ -396,6 +396,8 @@ $$0.0062\times 0.25^{2}\times 17047\approx 6.7$$
 | 介面 | claude.ai，啟用檔案與 Shell 工具，並透過桌面應用程式存取專案資料夾 |
 | 期間 | 2026-11-08 02:45 – 2026-11-09（Asia/Taipei） |
 | 其他 AI 工具 | 無（全程只使用 Claude Sonnet 5.5） |
+| 完整對話（公開連結） | https://claude.ai/share/c7f80221-4bbc-4509-ade9-f5ee6943d3d8（快照，不含附加截圖） |
+| 完整對話（離線備份） | `prompt_log/raw_exports/claude_conversation_2026-11-08_to_11-09.pdf` |
 
 完整歷程見儲存庫 `prompt_log/`：每個階段依「原始 Prompt（逐字）→ AI 產出 → 問題 → Refinement → 結果 → 提示工程觀察」記錄，完整對話原文放在 `prompt_log/raw_exports/`。
 
