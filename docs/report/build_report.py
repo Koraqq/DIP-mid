@@ -95,6 +95,12 @@ def make_reference_docx(path: pathlib.Path):
     sty("Heading 1").paragraph_format.space_after = Pt(8)
     set_font(sty("Heading 2"), FONT, 13, bold=True, color="2F5D8A")
     set_font(sty("Heading 3"), FONT, 11.5, bold=True, color="2F5D8A")
+    if sty("Heading 4"):
+        set_font(sty("Heading 4"), FONT, 10.5, bold=True, color="2F5D8A")
+        sty("Heading 4").paragraph_format.space_before = Pt(10)
+    if sty("Hyperlink"):
+        set_font(sty("Hyperlink"), FONT, color="0563C1")
+        sty("Hyperlink").font.underline = True
     for n in ("Image Caption", "Captioned Figure", "Figure"):
         if sty(n):
             sty(n).paragraph_format.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -223,6 +229,8 @@ def postprocess(src: pathlib.Path, dst: pathlib.Path, headings=None, pages=None)
                             r.bold = True
     placeholders = 0
     for para in doc.paragraphs:
+        if para.style is not None and para.style.name == "Source Code":
+            shade(para._p.get_or_add_pPr(), "F3F5F7")
         if "【待補" in para.text:
             placeholders += 1
             shade(para._p.get_or_add_pPr(), "FFF2CC")
@@ -316,15 +324,148 @@ def convert_to_pdf(docx_path: pathlib.Path) -> pathlib.Path:
     return out
 
 
+# ---------------------------------------------------------------- 由原稿自動產生的內容
+REPO = HERE.parents[1]
+PURPOSE = {
+    "streamlit": "互動式網頁介面（本專案的 UI 框架）",
+    "numpy": "陣列運算：卷積、色彩轉換、直方圖、PSNR",
+    "opencv-python-headless": "Haar-Cascade 人臉偵測與邊界框繪製（無 GUI 版本，適合雲端）",
+    "pillow": "影像解碼（PNG／JPG／BMP）、EXIF 方向處理",
+    "matplotlib": "直方圖繪製",
+    "altair": "宣告式圖表（Streamlit 圖表元件）",
+    "anyio": "非同步 I/O 抽象層",
+    "attrs": "類別屬性定義輔助",
+    "certifi": "HTTPS 憑證根清單",
+    "charset-normalizer": "文字編碼偵測",
+    "click": "命令列介面工具",
+    "contourpy": "等高線計算（Matplotlib）",
+    "cycler": "繪圖樣式循環（Matplotlib）",
+    "fonttools": "字型讀取與處理（Matplotlib）",
+    "h11": "HTTP/1.1 協定實作",
+    "idna": "國際化網域名稱處理",
+    "itsdangerous": "資料簽章",
+    "jinja2": "範本引擎",
+    "jsonschema": "JSON 結構驗證",
+    "jsonschema-specifications": "JSON Schema 規格資料",
+    "kiwisolver": "約束求解（Matplotlib 版面配置）",
+    "markupsafe": "範本字串跳脫",
+    "narwhals": "資料框相容層",
+    "packaging": "版本字串解析",
+    "pandas": "表格資料處理（Streamlit 表格顯示）",
+    "protobuf": "序列化格式（Streamlit 前後端通訊）",
+    "pyarrow": "欄式資料格式（Streamlit 資料傳輸）",
+    "pydeck": "地圖視覺化（Streamlit）",
+    "pyparsing": "文字剖析（Matplotlib）",
+    "python-dateutil": "日期時間處理",
+    "python-multipart": "表單與檔案上傳解析",
+    "referencing": "JSON 參照解析",
+    "requests": "HTTP 用戶端",
+    "rpds-py": "持久性資料結構",
+    "starlette": "ASGI 網頁框架（Streamlit 伺服器）",
+    "typing-extensions": "型別提示向後相容",
+    "tzdata": "時區資料",
+    "urllib3": "HTTP 連線函式庫",
+    "uvicorn": "ASGI 伺服器",
+    "watchdog": "檔案變更監看",
+    "websockets": "WebSocket 實作",
+}
+
+
+def build_req_table() -> str:
+    items, cur = [], None
+    for ln in (REPO / "requirements.txt").read_text(encoding="utf-8").splitlines():
+        m = re.match(r"^([A-Za-z0-9_.\-]+)==([^\s;]+)", ln)
+        if m:
+            cur = [m.group(1), m.group(2), []]
+            items.append(cur)
+            continue
+        s = ln.strip()
+        if cur is not None and ln.startswith((" ", "\t")) and s.startswith("#"):
+            if s.startswith("# via"):
+                rest = s[5:].strip()
+                if rest:
+                    cur[2].append(rest)
+            else:
+                cur[2].append(s.lstrip("#").strip())
+    missing = [n for n, _v, _w in items if n.lower() not in PURPOSE]
+    if missing:
+        raise SystemExit(f"requirements.txt 有套件缺少用途說明：{missing}")
+    rows = ["| 套件 | 版本 | 類型 | 被誰需要 | 用途 |", "|:--------------------|:----------|:----|:------------------|:--------------------------------|"]
+    for name, ver, via in sorted(items, key=lambda x: x[0].lower()):
+        direct = "dip-mid" in via
+        others = [v for v in via if v != "dip-mid"]
+        need = ("本專案" + ("、" + "、".join(others[:2]) + ("…" if len(others) > 2 else "") if others else "")) if direct \
+            else "、".join(others[:3]) + ("…" if len(others) > 3 else "")
+        rows.append(f"| `{name}` | {ver} | {'**直接**' if direct else '間接'} | {need} | {PURPOSE[name.lower()]} |")
+    print(f"套件表：{len(items)} 條（直接 {sum('dip-mid' in i[2] for i in items)}）")
+    return "\n".join(rows)
+
+
+STAGES = [
+    ("階段 1　需求分析、規劃與環境建置（P1–P4）", "01_project_setup.md"),
+    ("階段 2　影像載入與色彩空間（P5–P6）", "02_io_and_color.md"),
+    ("階段 3　卷積濾波與 PSNR（P6–P8）", "03_filtering_psnr.md"),
+    ("階段 4　人臉偵測（P8）", "04_face_detection.md"),
+    ("階段 5　README、GitHub 與部署（P9–P14）", "05_git_deployment.md"),
+    ("階段 6　報告、補件與繳交前檢查（P15–P28）", "06_report_and_colab.md"),
+]
+
+
+def convert_log(text: str) -> str:
+    text = text.replace("【待補】", "「待補」標記")   # 歷程中描述過去待補項目的文字，避免被誤標為未完成
+    out, in_code = [], False
+    for ln in text.splitlines():
+        if ln.strip().startswith("```"):
+            in_code = not in_code
+            out.append(ln)
+            continue
+        if in_code:
+            out.append(ln)
+            continue
+        if ln.startswith("# ") or ln.strip() == "---":
+            continue                                   # 檔案標題（改用階段標題）與水平線
+        if ln.startswith("## 待記錄"):
+            break                                      # 其後為待辦說明，不納入
+        if ln.startswith("## "):
+            out.append("#### " + ln[3:])
+        elif ln.startswith("### "):
+            out.append("**" + ln[4:].strip() + "**")
+        else:
+            out.append(re.sub(r"\[([^\]]+)\]\(([^)]*\.md)\)", r"\1", ln))
+    return "\n".join(out)
+
+
+def build_audit_trail() -> str:
+    parts = []
+    for title, fname in STAGES:
+        body = convert_log((REPO / "prompt_log" / fname).read_text(encoding="utf-8"))
+        parts.append(f"### {title}\n\n{body}\n")
+    return "\n".join(parts)
+
+
+def assemble_markdown() -> pathlib.Path:
+    text = (HERE / "report.md").read_text(encoding="utf-8")
+    text = text.replace("{{REQ_TABLE}}", build_req_table()).replace("{{AUDIT_TRAIL}}", build_audit_trail())
+    full = BUILD / "report_full.md"
+    full.write_text(text, encoding="utf-8")
+    return full
+
+
+def submission_name() -> str:
+    m = re.search(r'author:\s*"(\S+?)[　\s]+(C\d+)"', (HERE / "report.md").read_text(encoding="utf-8"))
+    return f"{m.group(2)}_{m.group(1)}_期中專題.pdf" if m else "report_submission.pdf"
+
+
 def main():
     BUILD.mkdir(exist_ok=True)
     run([sys.executable, str(HERE / "make_diagrams.py")])
     ref = BUILD / "reference.docx"
     make_reference_docx(ref)
     raw = BUILD / "report_raw.docx"
-    run(["pandoc", str(HERE / "report.md"), "-f", "markdown", "-o", str(raw),
+    full = assemble_markdown()
+    run(["pandoc", str(full), "-f", "markdown", "-o", str(raw),
          "--reference-doc", str(ref), "--resource-path", str(HERE)])
-    headings = parse_headings((HERE / "report.md").read_text(encoding="utf-8"))
+    headings = parse_headings(full.read_text(encoding="utf-8"))
     pages = [None] * len(headings)          # 第一輪先留空，取得實際頁碼後再填入
     final = BUILD / "report.docx"
     pdf = None
@@ -342,6 +483,7 @@ def main():
     if missing:
         raise SystemExit(f"找不到這些標題所在頁：{missing}")
     shutil.copy(pdf, HERE / "report.pdf")
+    shutil.copy(pdf, HERE / submission_name())
     print(f"完成：{HERE / 'report.pdf'}（待補標記 {n} 處，目錄 {len(headings)} 條）")
 
 

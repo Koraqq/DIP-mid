@@ -24,16 +24,22 @@ date: "2026-11-09"
 
 ## 1.2　開發環境
 
+**開發語言版本**：Python 3.12（記錄於 `.python-version`；`pyproject.toml` 設定 `requires-python = ">=3.12"`），高於建議的 Python 3.9+。
+
 | 項目 | 版本／說明 |
 |:--------|:------------------------------|
-| 語言與執行環境 | Python 3.12 |
-| 套件管理 | uv（`pyproject.toml` ＋ `uv.lock`），部署用 `requirements.txt` 由 `uv export` 產生 |
+| 套件管理 | uv（`pyproject.toml` ＋ `uv.lock`）；部署用 `requirements.txt` 由 `uv export --no-dev --no-hashes` 產生 |
 | 介面 | Streamlit 1.67 |
-| 數值運算 | NumPy 2.5（卷積、色彩轉換、PSNR 皆以 NumPy 實作） |
+| 數值運算 | NumPy 2.5（卷積、色彩轉換、直方圖、PSNR 皆以 NumPy 實作） |
 | 影像解碼 | Pillow 13 |
 | 人臉偵測 | opencv-python-headless 4.14（**必須為 4.x**，5.x 已移除 Haar-Cascade） |
 | 繪圖 | Matplotlib 3.11 |
-| 測試 | pytest、ruff |
+| 測試與檢查 | pytest、ruff（開發用，不列入 `requirements.txt`） |
+| 系統套件 | `fonts-noto-cjk`（`packages.txt`，雲端部署時安裝中文字型） |
+
+**第三方相依套件清單（`requirements.txt` 條目說明）**：`requirements.txt` 共 41 個固定版本的套件，其中 5 個為**直接相依**（專案程式碼直接使用），其餘 36 個為 Streamlit、Matplotlib 等的**間接相依**（「被誰需要」欄標出來源；`dip-mid` 即本專案）。
+
+{{REQ_TABLE}}
 
 ## 1.3　安裝與執行
 
@@ -65,30 +71,35 @@ DIP-mid/
 ├── requirements.txt、packages.txt、pyproject.toml、uv.lock
 ```
 
-# 2　可執行連結
+# 2　可執行連結（Live Demo / Source Code）
 
-本專案以 Streamlit Community Cloud 作為線上即時展示，不另提供 Colab。
+本專案以 Streamlit Community Cloud 作為線上即時展示，不另提供 Colab。兩個連結的檢閱權限皆為 **Public**（不需登入即可開啟）。
 
 | 項目 | 連結 |
 |:------------|:------------------------------------------------|
-| 線上展示（Streamlit Cloud，Public） | https://dip-mid-tb8vrujcpzjqkwkc5onscz.streamlit.app/ |
-| 原始碼（GitHub，Public） | https://github.com/koraqq/DIP-mid |
+| 線上即時展示（Streamlit Cloud，Public） | [https://dip-mid-tb8vrujcpzjqkwkc5onscz.streamlit.app/](https://dip-mid-tb8vrujcpzjqkwkc5onscz.streamlit.app/) |
+| 版本控制儲存庫與完整原始碼（GitHub，Public） | [https://github.com/koraqq/DIP-mid](https://github.com/koraqq/DIP-mid) |
+| 完整對話紀錄（AI Audit Trail 原文） | [https://claude.ai/share/c7f80221-4bbc-4509-ade9-f5ee6943d3d8](https://claude.ai/share/c7f80221-4bbc-4509-ade9-f5ee6943d3d8) |
 
-# 3　系統架構與資料流
+# 3　程式功能與操作說明書
 
-## 3.1　分層架構
+本章依序說明系統架構與資料流（3.1）、測試方式（3.2）、四項功能的操作與測試案例分析（3.3–3.6），以及 PSNR 的公式定義與濾波效果的客觀評估（3.7）。
+
+## 3.1　系統架構與資料流
+
+### 3.1.1　分層架構
 
 專案採「**介面層與演算法層分離**」：`imagelab/ui/` 只負責呈現與互動，所有影像處理邏輯放在不依賴 Streamlit 的演算法層，因此每個模組都能單獨以 pytest 測試，也能在 Colab 等其他環境重複使用。
 
 ![圖 1　系統分層架構圖](figures/diagram_architecture.png){width=15cm}
 
-## 3.2　資料流
+### 3.1.2　資料流
 
 使用者上傳的檔案先由 `load_image()` 統一解碼為 **RGB、uint8、(H, W, 3)** 的 NumPy 陣列，之後四個分頁共用這份資料。解碼結果以 `st.cache_data` 快取，切換分頁或調整參數時不需重新解碼；濾波與人臉偵測也各有快取，參數不變就不重算。
 
 ![圖 2　資料流圖](figures/diagram_dataflow.png){width=15cm}
 
-## 3.3　模組職責
+### 3.1.3　模組職責
 
 | 模組 | 職責 | 設計重點 |
 |:----------|:------------------------|:------------------------------------|
@@ -99,15 +110,15 @@ DIP-mid/
 | validation | 輸入防呆 | 指出出錯的列與格；提供可顯示的中文錯誤訊息 |
 | detection | Haar 偵測與繪圖 | 超大圖先縮小再偵測；對分類器加鎖以支援多人同時連線 |
 
-# 4　功能說明與測試案例分析
+## 3.2　測試影像與測試方式
 
 測試影像為一張 800×533 的 JPEG 照片（含一張清晰人臉與兩張失焦人臉）。本影像僅供本課程作業之非營利教學與展示用途，不作任何商業使用；作業繳交後儲存庫將改為私人。
 
-## 4.1　功能 1：影像載入與基礎解析
+## 3.3　功能 1：影像載入與基礎解析
 
 上傳後即時預覽，並以表格顯示檔名、格式、解析度、像素總數、原始色彩模式、通道數與檔案大小（圖 3：本例為 JPEG、800×533、426,400 像素、RGB 三通道、46.52 KB）。
 
-![圖 3　功能 1：影像預覽與中繼資訊](figures/ui_info.png){width=13cm}
+![圖 3　功能 1：影像預覽與中繼資訊](figures/ui_info.png){width=16cm}
 
 **測試案例（邊界條件）**
 
@@ -121,7 +132,7 @@ DIP-mid/
 | 不支援的格式（GIF） | 提示不支援並說明可用格式 | `test_unsupported_format_rejected` |
 | 超過 2500 萬像素 | 提示影像過大 | `test_too_large_rejected` |
 
-## 4.2　功能 2：色彩空間轉換與同步直方圖
+## 3.4　功能 2：色彩空間轉換與同步直方圖
 
 **RGB 通道分離**：直接取 $R$、$G$、$B$ 三個 2D 陣列，可選「著色」（只保留該通道、其餘為 0）或「灰階」顯示。
 
@@ -133,11 +144,11 @@ $$\begin{bmatrix}Y\\U\\V\end{bmatrix}=\begin{bmatrix}0.299&0.587&0.114\\-0.16873
 
 **同步直方圖**：每個顯示模式下，影像與其對應通道的直方圖在同一次繪製中由同一份資料計算：Original 顯示灰階（亮度）與 RGB 疊圖直方圖；RGB 模式顯示 R、G、B 各自的影像與直方圖；YUV 模式顯示 Y、U、V 各自的影像與直方圖。因此切換模式時，影像與直方圖不可能不同步。
 
-![圖 4　Original 模式：灰階直方圖與 RGB 疊圖直方圖](figures/ui_color_original.png){width=13cm}
+![圖 4　Original 模式：灰階直方圖與 RGB 疊圖直方圖](figures/ui_color_original.png){width=16cm}
 
-![圖 5　RGB 分量模式：三個通道圖與各自的直方圖](figures/ui_color_rgb.png){width=13cm}
+![圖 5　RGB 分量模式：三個通道圖與各自的直方圖](figures/ui_color_rgb.png){width=16cm}
 
-![圖 6　YUV 分量模式：Y、U、V 分量圖與各自的直方圖](figures/ui_color_yuv.png){width=13cm}
+![圖 6　YUV 分量模式：Y、U、V 分量圖與各自的直方圖](figures/ui_color_yuv.png){width=16cm}
 
 **觀察**：本例的 U、V 直方圖都集中在 128 附近、範圍很窄，所以 U、V 分量圖看起來偏灰、對比低；這是因為多數像素色彩飽和度不高，色度偏離中性（128）的程度小。Y 分量則涵蓋整個亮度範圍，與灰階影像相同。
 
@@ -152,9 +163,9 @@ $$\begin{bmatrix}Y\\U\\V\end{bmatrix}=\begin{bmatrix}0.299&0.587&0.114\\-0.16873
 | 非 uint8 輸入 | 拒絕並報錯 | `test_rejects_non_uint8` |
 | 系統沒有中文字型 | 圖表標題退回英文，不出現方框 | `test_title_falls_back_to_english_without_cjk_font` |
 
-## 4.3　功能 3：自訂卷積核空間濾波與 PSNR
+## 3.5　功能 3：自訂卷積核空間濾波與 PSNR
 
-### 4.3.1　卷積定義與實作
+### 3.5.1　卷積定義與實作
 
 核 $K$ 為 $k\times k$（$k$ 為奇數），中心偏移 $c=\lfloor k/2\rfloor$，**卷積**定義為：
 
@@ -172,7 +183,7 @@ $$\mathrm{out}[i,j]=\sum_{u}\sum_{v}K'[u,v]\;P[i+u,\;j+v],\qquad K'[u,v]=K[k-1-u
 
 **輸出轉換**：卷積結果為浮點數，加上偏移後四捨五入並截斷到 $[0,255]$，轉回 uint8。對含負響應的核（邊緣類），可勾選「加 128 偏移」讓正負響應都能顯示。
 
-### 4.3.2　預設範本
+### 3.5.2　預設範本
 
 | 範本 | 核 | 正規化 | 偏移 |
 |:------------------|:--------------------------|:--------|:------|
@@ -186,27 +197,27 @@ $$\mathrm{out}[i,j]=\sum_{u}\sum_{v}K'[u,v]\;P[i+u,\;j+v],\qquad K'[u,v]=K[k-1-u
 | Sobel Y | $[-1,-2,-1;\;0,0,0;\;1,2,1]$ | 略過（總和 0） | 128 |
 | Laplacian | $[0,1,0;\;1,-4,1;\;0,1,0]$ | 略過（總和 0） | 128 |
 
-### 4.3.3　實測畫面
+### 3.5.3　實測畫面
 
-每張畫面左側為核輸入與設定，右側由左至右為濾波前、濾波後、差異圖（×4 放大），下方為 PSNR。各範本的 PSNR 數值彙整於第 5 章。
+每張畫面左側為核輸入與設定，右側由左至右為濾波前、濾波後、差異圖（×4 放大），下方為 PSNR。各範本的 PSNR 數值彙整於第 3.7 節。
 
-![圖 7　Box 均值模糊 3×3](figures/ui_filter_box3.png){width=13cm}
+![圖 7　Box 均值模糊 3×3](figures/ui_filter_box3.png){width=16cm}
 
-![圖 8　Gaussian 3×3](figures/ui_filter_gauss3.png){width=13cm}
+![圖 8　Gaussian 3×3](figures/ui_filter_gauss3.png){width=16cm}
 
-![圖 9　Gaussian 5×5](figures/ui_filter_gauss5.png){width=13cm}
+![圖 9　Gaussian 5×5](figures/ui_filter_gauss5.png){width=16cm}
 
-![圖 10　Sharpen 銳化](figures/ui_filter_sharpen.png){width=13cm}
+![圖 10　Sharpen 銳化](figures/ui_filter_sharpen.png){width=16cm}
 
-![圖 11　Emboss 浮雕](figures/ui_filter_emboss.png){width=13cm}
+![圖 11　Emboss 浮雕](figures/ui_filter_emboss.png){width=16cm}
 
-![圖 12　Sobel X（垂直邊緣）](figures/ui_filter_sobelx.png){width=13cm}
+![圖 12　Sobel X（垂直邊緣）](figures/ui_filter_sobelx.png){width=16cm}
 
-![圖 13　Sobel Y（水平邊緣）](figures/ui_filter_sobely.png){width=13cm}
+![圖 13　Sobel Y（水平邊緣）](figures/ui_filter_sobely.png){width=16cm}
 
-![圖 14　Laplacian](figures/ui_filter_laplacian.png){width=13cm}
+![圖 14　Laplacian](figures/ui_filter_laplacian.png){width=16cm}
 
-### 4.3.4　邊界條件與輸入防呆
+### 3.5.4　邊界條件與輸入防呆
 
 | 測試案例 | 預期行為 | 驗證方式 |
 |:--------------------|:--------------------------|:------------------------|
@@ -228,19 +239,19 @@ $$\mathrm{out}[i,j]=\sum_{u}\sum_{v}K'[u,v]\;P[i+u,\;j+v],\qquad K'[u,v]=K[k-1-u
 
 **防呆介面實測**：以下 5 張為實際輸入錯誤或特殊核時的畫面。輸入有誤時，左側顯示明確的錯誤或警告訊息，右側提示先修正，程式不會當機。
 
-![圖 15　防呆 1：輸入 2×3 的非方陣，顯示「卷積核必須是方陣，目前是 2×3」](figures/guard_1_nonsquare.png){width=13cm}
+![圖 15　防呆 1：輸入 2×3 的非方陣，顯示「卷積核必須是方陣，目前是 2×3」](figures/guard_1_nonsquare.png){width=16cm}
 
-![圖 16　防呆 2：輸入 2×2 的偶數尺寸核，顯示「尺寸必須是奇數」](figures/guard_2_even.png){width=13cm}
+![圖 16　防呆 2：輸入 2×2 的偶數尺寸核，顯示「尺寸必須是奇數」](figures/guard_2_even.png){width=16cm}
 
-![圖 17　防呆 3：第 2 列第 3 格輸入 abc，指出是哪一列哪一格不是有效數字](figures/guard_3_badtoken.png){width=13cm}
+![圖 17　防呆 3：第 2 列第 3 格輸入 abc，指出是哪一列哪一格不是有效數字](figures/guard_3_badtoken.png){width=16cm}
 
-![圖 18　防呆 4：Sobel X 勾選正規化，核總和為 0，自動略過並提示（避免除以零）](figures/guard_4_sobel_normalize.png){width=13cm}
+![圖 18　防呆 4：Sobel X 勾選正規化，核總和為 0，自動略過並提示（避免除以零）](figures/guard_4_sobel_normalize.png){width=16cm}
 
-![圖 19　防呆 5：Identity 範本，濾波前後完全相同（MSE = 0），PSNR 顯示 ∞](figures/guard_5_identity_inf.png){width=13cm}
+![圖 19　防呆 5：Identity 範本，濾波前後完全相同（MSE = 0），PSNR 顯示 ∞](figures/guard_5_identity_inf.png){width=16cm}
 
-## 4.4　功能 4：人臉偵測
+## 3.6　功能 4：人臉偵測
 
-### 4.4.1　演算法
+### 3.6.1　演算法
 
 採用 Viola–Jones 的 **Haar-Cascade**（OpenCV 內建的 `haarcascade_frontalface_default.xml`）：以 Haar-like 矩形特徵描述明暗對比；用**積分影像**使任一矩形和只需 4 次查表；以 AdaBoost 挑選特徵組成強分類器；再把多個強分類器串成**級聯（cascade）**，前面的簡單階段能快速排除大多數非人臉區域。偵測時在影像金字塔的多個尺度上以滑動視窗搜尋。
 
@@ -252,11 +263,11 @@ $$\mathrm{confidence}=1-e^{-w/2}$$
 
 並同時顯示原始權重。這是**啟發式正規化**，適合比較同一張影像中各框的相對可信度，不代表真實機率。
 
-### 4.4.2　實測畫面
+### 3.6.2　實測畫面
 
 **預設參數**（scaleFactor = 1.10、minNeighbors = 5、最小人臉尺寸 = 30）：測試影像中的三張臉都被偵測到，其中包含兩張失焦的臉。
 
-![圖 20　預設參數的偵測結果（綠框標籤為 #編號 與信心度）](figures/face_1_default.png){width=14cm}
+![圖 20　預設參數的偵測結果（綠框標籤為 #編號 與信心度）](figures/face_1_default.png){width=16cm}
 
 | # | 位置 (x, y) | 大小 (w×h) | 信心度 | 原始層級權重 $w$ |
 |:--|:----------|:----------|:--------|:------------|
@@ -268,19 +279,19 @@ $$\mathrm{confidence}=1-e^{-w/2}$$
 
 **參數調整與無人臉的情況**
 
-![圖 21　minNeighbors = 1（其餘為預設）：仍為 3 張臉，位置與信心度和預設完全相同](figures/face_2_neighbors_low.png){width=14cm}
+![圖 21　minNeighbors = 1（其餘為預設）：仍為 3 張臉，位置與信心度和預設完全相同](figures/face_2_neighbors_low.png){width=16cm}
 
-![圖 22　minNeighbors = 12（其餘為預設）：只剩 2 張臉，中間較大的清楚人臉不再被保留](figures/face_3_neighbors_high.png){width=14cm}
+![圖 22　minNeighbors = 12（其餘為預設）：只剩 2 張臉，中間較大的清楚人臉不再被保留](figures/face_3_neighbors_high.png){width=16cm}
 
-![圖 23　最小人臉尺寸調大（約 300 像素）：沒有人臉大於此尺寸，偵測 0 張](figures/face_4_minsize_large.png){width=13cm}
+![圖 23　最小人臉尺寸調大（約 300 像素）：沒有人臉大於此尺寸，偵測 0 張](figures/face_4_minsize_large.png){width=16cm}
 
-![圖 24　影像中沒有人臉：偵測 0 張，程式不當機](figures/face_5_noface.png){width=13cm}
+![圖 24　影像中沒有人臉：偵測 0 張，程式不當機](figures/face_5_noface.png){width=16cm}
 
 **觀察**：`minNeighbors` 從預設的 5 降到 1（圖 21），結果仍是同樣的 3 張臉，沒有多出誤判框，表示本例中沒有明顯的假陽性候選；調高到 12（圖 22），保留下來的只有左側失焦的人臉（#1）與右側的臉（原 #3），中間較大、最清楚的人臉被濾掉。
 
 `minNeighbors` 要求一個候選區域周圍有足夠多個重疊的偵測窗才保留。調高它會讓門檻變嚴格，但嚴格不等於「只留下最可信的」：本例中被濾掉的是信心度 0.966 的大臉，保留的反而有信心度 0.624 的臉。一個可能的解釋是，大尺寸的臉在影像金字塔上能產生的重疊窗較少，所以較不容易達到高門檻（此為推測，未另做實驗驗證）。因此 `minNeighbors` 與信心度衡量的是不同的東西，調參時兩者需要一起觀察。
 
-### 4.4.3　邊界條件
+### 3.6.3　邊界條件
 
 | 測試案例 | 預期行為 | 驗證方式 |
 |:----------------------|:--------------------------|:------------------------|
@@ -298,13 +309,13 @@ $$\mathrm{confidence}=1-e^{-w/2}$$
 | 最小人臉尺寸大於影像中所有人臉 | 偵測 0 張，不當機 | 圖 23 |
 | 影像中沒有人臉 | 偵測 0 張，不當機 | 圖 24 |
 
-### 4.4.4　單元測試
+### 3.6.4　單元測試
 
 所有模組皆以 pytest 測試（`tests/`）：在開發機（Windows、Python 3.12）上的結果為 **71 個通過、1 個略過**（0 失敗）。略過的是選用的真實影像測試：`assets/samples/` 內沒有 `face*.jpg` 範例圖時會自動略過；其餘包含需要 Haar 模型的偵測測試皆通過。
 
-# 5　PSNR 公式與濾波效果評估
+## 3.7　PSNR 公式與濾波效果評估
 
-## 5.1　公式推導
+### 3.7.1　公式推導
 
 設原圖為 $I$、濾波後影像為 $K$，尺寸 $M\times N$，8-bit 影像的最大像素值 $\mathrm{MAX}=2^8-1=255$。
 
@@ -322,7 +333,7 @@ $$\mathrm{PSNR}=10\log_{10}\!\left(\frac{\mathrm{MAX}^{2}}{\mathrm{MSE}}\right)=
 
 **幾何意義**：把影像看成 $\mathbb{R}^{MN}$ 中的向量，$\mathrm{MSE}=\lVert\mathbf{x}_I-\mathbf{x}_K\rVert_2^2/(MN)$，亦即兩影像在像素空間中歐氏距離平方的平均；PSNR 是這個距離經 $-10\log_{10}(\cdot)$ 轉換的結果，距離越近 PSNR 越高。
 
-## 5.2　本專案的計算方式
+### 3.7.2　本專案的計算方式
 
 - **逐通道**：對 R、G、B 分別計算 MSE 與 PSNR。
 - **R/G/B 通道平均**：三個通道 PSNR（dB）的算術平均。
@@ -330,9 +341,9 @@ $$\mathrm{PSNR}=10\log_{10}\!\left(\frac{\mathrm{MAX}^{2}}{\mathrm{MSE}}\right)=
 - 先轉 float64 再相減，避免 uint8 溢位（例如 $0-255$ 在 uint8 會變成 $1$）；`test_no_uint8_wraparound` 驗證了這點。
 - $\mathrm{MSE}=0$ 時定義 $\mathrm{PSNR}=\infty$，介面顯示「∞」。
 
-## 5.3　各濾波器的實測結果
+### 3.7.3　各濾波器的實測結果
 
-下表取自第 4.3.3 節各張畫面（同一張測試影像）。Y 的 PSNR 與 MSE 可互相換算驗證（例如 Box：$10\log_{10}(65025/21.80)=34.75$ dB）。
+下表取自第 3.5.3 節各張畫面（同一張測試影像）。Y 的 PSNR 與 MSE 可互相換算驗證（例如 Box：$10\log_{10}(65025/21.80)=34.75$ dB）。
 
 | 濾波器 | PSNR（亮度 Y） | PSNR（R/G/B 平均） | MSE（亮度 Y） | 效果 |
 |:----------------|--------:|--------:|---------:|:-------------------------|
@@ -347,9 +358,9 @@ $$\mathrm{PSNR}=10\log_{10}\!\left(\frac{\mathrm{MAX}^{2}}{\mathrm{MSE}}\right)=
 
 **截圖設定**：本節各張截圖顯示的邊界處理為「補零（zero）」（程式的預設值為鏡射）；正規化與偏移為各預設範本的預設值（Box、Gaussian 勾選正規化；Sobel、Laplacian 勾選「加 128 偏移」；Sharpen、Emboss 兩者皆無）。
 
-邊界處理對結果的影響見第 5.4 節。
+邊界處理對結果的影響見第 3.7.4 節。
 
-## 5.4　邊界處理對 PSNR 的影響
+### 3.7.4　邊界處理對 PSNR 的影響
 
 為了說明為何本報告的 Gaussian 3×3 為 37.10 dB（補零），而以鏡射測得的結果更高，以同一張影像、同一個 Gaussian 3×3 核（皆勾選正規化），只改變邊界處理：
 
@@ -359,11 +370,11 @@ $$\mathrm{PSNR}=10\log_{10}\!\left(\frac{\mathrm{MAX}^{2}}{\mathrm{MSE}}\right)=
 | 鏡射（reflect） | 40.63 dB | 40.24 dB | 5.62 |
 | 複製邊緣（replicate） | 40.65 dB | 40.26 dB | 5.59 |
 
-![圖 25　Gaussian 3×3，邊界處理＝補零](figures/pad_zero.png){width=13cm}
+![圖 25　Gaussian 3×3，邊界處理＝補零](figures/pad_zero.png){width=16cm}
 
-![圖 26　Gaussian 3×3，邊界處理＝鏡射](figures/pad_reflect.png){width=13cm}
+![圖 26　Gaussian 3×3，邊界處理＝鏡射](figures/pad_reflect.png){width=16cm}
 
-![圖 27　Gaussian 3×3，邊界處理＝複製邊緣](figures/pad_replicate.png){width=13cm}
+![圖 27　Gaussian 3×3，邊界處理＝複製邊緣](figures/pad_replicate.png){width=16cm}
 
 **代數推導**：補零時，視窗滑到影像最外圈會有一排格子落在影像外，被當成 0。3×3 高斯核正規化後的權重為 $\frac{1}{16}\begin{bmatrix}1&2&1\\2&4&2\\1&2&1\end{bmatrix}$，最外圈（非角落）像素有一整排（權重 $1+2+1=4$，即 $4/16=25\%$）落在影像外，若該處亮度為 $Y$，輸出約為 $0.75\,Y$，誤差約 $0.25\,Y$。
 
@@ -377,7 +388,7 @@ $$0.0062\times 0.25^{2}\times 17047\approx 6.7$$
 
 **結論**：邊界處理會直接影響 PSNR，比較不同濾波器的 PSNR 時必須固定同一種邊界處理。本專案預設使用鏡射，以避免黑邊造成的人為誤差。
 
-## 5.5　客觀評估分析
+### 3.7.5　客觀評估分析
 
 1. **模糊類濾波器的 PSNR 約 34–37 dB**，屬於差異小、可接受的範圍。相同 3×3 大小下，Gaussian（37.10 dB）高於 Box（34.75 dB），因為高斯核把較大的權重放在中心，對原圖的改變較小；Box 把九個像素等權平均，模糊較重。
 2. **核越大、模糊越強、PSNR 越低**：Gaussian 5×5（34.50 dB）低於 Gaussian 3×3（37.10 dB），因為 5×5 平均了更大範圍的像素，細節損失更多。
@@ -386,9 +397,9 @@ $$0.0062\times 0.25^{2}\times 17047\approx 6.7$$
 5. **PSNR 的限制**：它逐像素比較數值差，不考慮人眼感知與結構（例如整張圖平移一格，視覺幾乎相同，PSNR 卻可能很低）。因此本報告同時提供並排對照與差異圖，作為量化數字之外的視覺佐證。
 6. **證據範圍**：以上數值來自單一張測試影像；不同內容（平滑區域多寡、紋理多寡）會得到不同的 PSNR，絕對數值不宜直接類推到其他影像，但各濾波器之間的**相對大小關係**符合理論預期。
 
-# 6　AI 協作與 Prompt 歷程
+# 4　AI 協作與完整 Prompt 歷程（AI Audit Trail）
 
-## 6.1　使用的模型
+## 4.1　使用的模型
 
 | 項目 | 內容 |
 |:--------|:------------------------------------------|
@@ -396,12 +407,12 @@ $$0.0062\times 0.25^{2}\times 17047\approx 6.7$$
 | 介面 | claude.ai，啟用檔案與 Shell 工具，並透過桌面應用程式存取專案資料夾 |
 | 期間 | 2026-11-08 02:45 – 2026-11-09（Asia/Taipei） |
 | 其他 AI 工具 | 無（全程只使用 Claude Sonnet 5.5） |
-| 完整對話（公開連結） | https://claude.ai/share/c7f80221-4bbc-4509-ade9-f5ee6943d3d8（快照，不含附加截圖） |
+| 完整對話（公開連結） | [https://claude.ai/share/c7f80221-4bbc-4509-ade9-f5ee6943d3d8](https://claude.ai/share/c7f80221-4bbc-4509-ade9-f5ee6943d3d8)（快照，不含附加截圖） |
 | 完整對話（離線備份） | `prompt_log/raw_exports/claude_conversation_2026-11-08_to_11-09.pdf` |
 
 完整歷程見儲存庫 `prompt_log/`：每個階段依「原始 Prompt（逐字）→ AI 產出 → 問題 → Refinement → 結果 → 提示工程觀察」記錄，完整對話原文放在 `prompt_log/raw_exports/`。
 
-## 6.2　協作流程
+## 4.2　協作流程
 
 | 階段 | 使用者 Prompt 的策略 | AI 的產出 |
 |:----------|:------------------------------|:------------------------------|
@@ -410,7 +421,7 @@ $$0.0062\times 0.25^{2}\times 17047\approx 6.7$$
 | 實作（P5–P8） | 先短指令（「請遵守規則，並且繼續實作」），再用截圖回報；使用條件式指令（「有問題就修正，無問題就繼續」） | io／color／直方圖、卷積／PSNR／防呆、人臉偵測與測試 |
 | 部署（P9–P14） | 直接貼上終端機輸出 | README、Git 與 Streamlit Cloud 疑難排解 |
 
-## 6.3　AI 的失誤與修正
+## 4.3　AI 的失誤與修正
 
 | # | 問題 | 發現方式 | 修正 |
 |:--|:----------------------------|:--------------------|:----------------------------|
@@ -423,7 +434,15 @@ $$0.0062\times 0.25^{2}\times 17047\approx 6.7$$
 
 這些失誤的共同點是「**預設值未經確認就被使用**」，修正方式都是先檢查實際狀態再下指令。
 
-# 7　結論與已知限制
+## 4.4　完整 Prompt 歷程（依時間序）
+
+以下依時間序記錄開發過程中的每一則 Prompt。每則皆包含：**原始 Prompt（逐字）→ AI 產出摘要 → 問題與修正（Refinement）→ 結果**。使用者在對話中貼上的截圖為附件，此處以文字說明其內容，截圖原檔見儲存庫 `docs/images/`，並已用於本報告第 3 章。
+
+完整對話原文：[公開分享連結](https://claude.ai/share/c7f80221-4bbc-4509-ade9-f5ee6943d3d8)（為快照，涵蓋至 P24b；之後的紀錄見下文）；離線備份 PDF 位於儲存庫 `prompt_log/raw_exports/`。
+
+{{AUDIT_TRAIL}}
+
+# 5　結論與已知限制
 
 **結論**：本專案完成四大功能，並以介面層與演算法層分離、完整的輸入防呆、對照 OpenCV 的卷積驗證、PSNR 公式推導與實測分析，滿足作業要求；線上展示與原始碼皆為公開。
 

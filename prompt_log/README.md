@@ -14,7 +14,7 @@
 | [03_filtering_psnr.md](03_filtering_psnr.md) | 卷積濾波、輸入防呆、PSNR | P6–P8 |
 | [04_face_detection.md](04_face_detection.md) | Haar-Cascade 人臉偵測與信心度 | P8 |
 | [05_git_deployment.md](05_git_deployment.md) | README、GitHub 推送、Streamlit Cloud 部署 | P9–P14 |
-| [06_report_and_colab.md](06_report_and_colab.md) | 技術報告 PDF（進行中；Colab 已取消） | P15–P27 |
+| [06_report_and_colab.md](06_report_and_colab.md) | 技術報告 PDF（進行中；Colab 已取消） | P15–P28 |
 | [raw_exports/](raw_exports/) | 完整對話原文匯出（不可竄改的底稿） | 全部 |
 
 ## 每個階段的格式
@@ -52,6 +52,8 @@
 | P25 | 2026-11-09 23:19 | 建立分享連結與備份 PDF |
 | P26 | 2026-11-09 23:26 | 同一連結、詢問是否完成（備份 PDF 仍不完整） |
 | P27 | 2026-11-09 23:30 | 準備繳交（備份 PDF 驗證通過） |
+| P27b | 2026-11-09 23:34 | Ctrl+Z 誤復原與最後檢查 |
+| P28 | 2026-11-09 23:40 | 依繳交規範重整報告（章節、檔名、完整 Prompt 歷程、超連結） |
 
 ## AI 失誤與修正總表
 
